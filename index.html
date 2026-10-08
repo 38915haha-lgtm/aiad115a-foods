@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>桃園市政府員工子女特約托育機構一覽地圖 (114年)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --accent: #f59e0b;
+      --bg: #f8fafc;
+      --panel-bg: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+    }
+
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header .stats-badge {
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+
+    .main-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 54px);
+      position: relative;
+    }
+
+    /* Sidebar controls */
+    .sidebar {
+      width: 420px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      z-index: 999;
+      box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .filter-panel {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .filters-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filters-row select {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .list-header {
+      padding: 10px 16px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .facility-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--primary-light);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.06);
+    }
+
+    .card.active {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--primary);
+      line-height: 1.3;
+    }
+
+    .tag {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .tag-kindergarten { background: #fee2e2; color: #991b1b; }
+    .tag-afterschool { background: #fef3c7; color: #92400e; }
+    .tag-infant { background: #e0f2fe; color: #075985; }
+
+    .card-meta {
+      font-size: 0.82rem;
+      color: #4b5563;
+      margin-bottom: 4px;
+    }
+
+    .card-benefit {
+      font-size: 0.8rem;
+      color: #047857;
+      background: #ecfdf5;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin-top: 6px;
+      white-space: pre-line;
+      line-height: 1.35;
+    }
+
+    #map {
+      flex: 1;
+      height: 100%;
+      background: #e2e8f0;
+    }
+
+    /* Popup Styling */
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    }
+
+    .popup-box {
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .popup-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary);
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+
+    .popup-field {
+      margin-bottom: 4px;
+    }
+
+    .popup-field strong {
+      color: #374151;
+    }
+
+    .popup-benefit {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 4px;
+      padding: 6px;
+      margin-top: 6px;
+      color: #166534;
+      font-size: 0.8rem;
+      white-space: pre-line;
+    }
+
+    .btn-nav {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 10px;
+      background: #2563eb;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    .btn-nav:hover {
+      background: #1d4ed8;
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 48%;
+      }
+      #map {
+        height: 52%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>桃園市政府員工子女特約托育機構一覽地圖</h1>
+    <div class="stats-badge" id="statsCount">載入中...</div>
+  </header>
+
+  <div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="filter-panel">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="搜尋機構名稱、地址或電話..." />
+        </div>
+        <div class="filters-row">
+          <select id="areaFilter">
+            <option value="">全部行政區 (全桃園)</option>
+          </select>
+          <select id="typeFilter">
+            <option value="">全部類型</option>
+          </select>
+        </div>
+      </div>
+      <div class="list-header">
+        <span>機構清單</span>
+        <span id="filteredCount">共 111 家</span>
+      </div>
+      <div class="facility-list" id="facilityList"></div>
+    </div>
+
+    <!-- Map View -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet & Plugin Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script>
+    // 依據提供的 CSV 檔案完整萃取之 111 筆真實資料
+    const RAW_DATA = [
+      {"id":1,"name":"桃園市私立松果幼兒園","type":"幼兒園","address":"桃園區大業路二段71號","area":"桃園","head":"李俊漢","contact":"呂○彤","phone":"03-3161778","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":2,"name":"桃園市私立國際長頸鹿幼兒園","type":"幼兒園","address":"桃園區宏昌八街71號1.2樓","area":"桃園","head":"陳燕輝","contact":"邱○湄","phone":"03-3703123","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":3,"name":"桃園市私立御寶兒幼兒園","type":"幼兒園","address":"桃園區大興西路二段55號2樓","area":"桃園","head":"謝慧玉","contact":"陳○蓉","phone":"03-3011313","fax":"03-3019393","benefit":"1.贈送書包、室內鞋。\n2.免費提供延托30分鐘。","period":"113年7月8日至115年7月7日止"},
+      {"id":4,"name":"桃園市私立華人幼兒園","type":"幼兒園","address":"桃園區永安路760-1號","area":"桃園","head":"吳榮秀","contact":"曾○秀","phone":"03-3017770","fax":"03-3023021","benefit":"新生入學贈送書包1個、餐具組1組。","period":"113年7月8日至115年7月7日止"},
+      {"id":5,"name":"桃園市私立紘彩幼兒園","type":"幼兒園","address":"新屋區中興北路42號","area":"桃園","head":"王國正","contact":"王○正","phone":"03-4971383","fax":"03-4971661","benefit":"1.贈送精美書包、冬季外套各乙件。\n2.每月免收逾時費2次(限逾時半小時內)。","period":"113年7月8日至115年7月7日止"},
+      {"id":6,"name":"桃園市私立康大幼兒園","type":"幼兒園","address":"觀音區中山路二段763巷5號2.3樓","area":"桃園","head":"林康敏","contact":"林○敏","phone":"03-4981156","fax":"03-4988775","benefit":"贈送當季制服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":7,"name":"桃園市私立乖乖幼兒園","type":"幼兒園","address":"中壢區內定二街139巷121弄5號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-4623758","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":8,"name":"桃園市私立育全豐德幼兒園","type":"幼兒園","address":"八德區豐德路385號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3688177","fax":"03-3688200","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":9,"name":"桃園市私立方濟幼兒園","type":"幼兒園","address":"楊梅區梅山西街89號","area":"楊梅","head":"財團法人天主教會新竹教區","contact":"胡○英","phone":"03-4856002","fax":"03-4856002","benefit":"每學期幼童各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":10,"name":"桃園市私立育成幼兒園","type":"幼兒園","address":"楊梅區秀才路207巷2弄6號","area":"楊梅","head":"黃新維","contact":"黃○維","phone":"03-4853051","fax":"03-4853049","benefit":"註冊即贈送書包、圍兜、三色碗及餐袋。","period":"113年7月8日至115年7月7日止"},
+      {"id":11,"name":"桃園市私立中原幼兒園","type":"幼兒園","address":"中壢區中原路48號","area":"中壢","head":"徐朝貴","contact":"何○鳳","phone":"03-4258752","fax":"03-4259837","benefit":"贈送精緻書包、餐具、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":12,"name":"桃園市私立新力幼兒園","type":"幼兒園","address":"中壢區忠福里福州二街358巷1號","area":"中壢","head":"鄧仁興","contact":"鄧○興","phone":"03-4625533","fax":"03-4625537","benefit":"註冊即贈送書包、三色碗餐袋。","period":"113年7月8日至115年7月7日止"},
+      {"id":13,"name":"桃園市私立喬幼蘆竹幼兒園","type":"幼兒園","address":"蘆竹區吉林路137號","area":"蘆竹","head":"林俊賢","contact":"林○賢","phone":"03-3112255","fax":"03-3117755","benefit":"贈送註冊新生書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":14,"name":"桃園市私立幼幼幼兒園","type":"幼兒園","address":"蘆竹區南順四街45號","area":"蘆竹","head":"李俊漢","contact":"陳○蓉","phone":"03-3224729","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":15,"name":"桃園市私立愛的世界幼兒園","type":"幼兒園","address":"中壢區環北路398號2樓之1","area":"中壢","head":"古美蘭","contact":"古○蘭","phone":"03-4272186","fax":"03-4272186","benefit":"贈送當期教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":16,"name":"桃園市私立快樂幼兒園","type":"幼兒園","address":"中壢區普騰街56號","area":"中壢","head":"黃乾德","contact":"黃○德","phone":"03-4560738","fax":"03-4566418","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":17,"name":"桃園市私立上林幼兒園","type":"幼兒園","address":"桃園區樹林里昆明路93號","area":"桃園","head":"李俊漢","contact":"林○瑩","phone":"03-3642199","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":18,"name":"桃園市私立天聲幼兒園","type":"幼兒園","address":"中壢區延平路366號3樓","area":"中壢","head":"徐秀珠","contact":"徐○珠","phone":"03-4259838","fax":"03-4228919","benefit":"贈送書包、三色碗及餐袋。","period":"113年7月8日至115年7月7日止"},
+      {"id":19,"name":"桃園市私立德育幼兒園","type":"幼兒園","address":"桃園區信光街62號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3563911","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":20,"name":"桃園市私立大園幼兒園","type":"幼兒園","address":"大園區和平東路83號","area":"大園","head":"游美月","contact":"游○月","phone":"03-3862215","fax":"03-3850020","benefit":"送書包、餐具、運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":21,"name":"桃園市私立溫格爾幼兒園","type":"幼兒園","address":"桃園區宏昌八街71號","area":"桃園","head":"陳燕輝","contact":"邱○湄","phone":"03-2289658","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":22,"name":"桃園市私立瑞恩帝兒幼兒園","type":"幼兒園","address":"桃園區中埔二街182號","area":"桃園","head":"呂文芳","contact":"李○珠","phone":"03-3010777","fax":"03-3011340","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":23,"name":"桃園市私立瑞恩帝兒桃德幼兒園","type":"幼兒園","address":"八德區桃德路203號","area":"八德","head":"呂文芳","contact":"李○珠","phone":"03-3665798","fax":"03-3665545","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":24,"name":"桃園市私立格林幼兒園","type":"幼兒園","address":"龜山區自強南路342號","area":"龜山","head":"趙良英","contact":"趙○英","phone":"03-3298288","fax":"03-3507119","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":25,"name":"桃園市私立大華幼兒園","type":"幼兒園","address":"蘆竹區大竹路430號","area":"蘆竹","head":"李俊漢","contact":"陳○蓉","phone":"03-3232013","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":26,"name":"桃園市私立劍橋幼兒園","type":"幼兒園","address":"龜山區文化七路106號","area":"龜山","head":"林俊賢","contact":"林○賢","phone":"03-3972233","fax":"03-3974955","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":27,"name":"桃園市私立育全幼兒園","type":"幼兒園","address":"八德區高城六街57號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3605638","fax":"03-3701398","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":28,"name":"桃園市私立育全大湳幼兒園","type":"幼兒園","address":"八德區大明街22號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3663000","fax":"03-3666249","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":29,"name":"桃園市私立瑞恩帝兒南崁幼兒園","type":"幼兒園","address":"蘆竹區吉林路20號","area":"蘆竹","head":"呂文芳","contact":"李○珠","phone":"03-3118991","fax":"03-3118992","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":30,"name":"桃園市私立文心幼兒園","type":"幼兒園","address":"八德區忠勇街427巷26號","area":"八德","head":"簡文心","contact":"簡○心","phone":"03-3765415","fax":"03-3765416","benefit":"贈送書包、餐具組、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":31,"name":"桃園市私立長頸鹿幼兒園","type":"幼兒園","address":"中壢區廣州路198號","area":"中壢","head":"陳燕輝","contact":"邱○湄","phone":"03-4688266","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":32,"name":"桃園市私立諾瓦幼兒園","type":"幼兒園","address":"龍潭區渴望園區渴望路660巷99號","area":"龍潭","head":"蘇偉馨","contact":"蘇○馨","phone":"03-4071698","fax":"03-4071697","benefit":"每學期優惠月費1,000元整。","period":"113年7月8日至115年7月7日止"},
+      {"id":33,"name":"桃園市私立晨光幼兒園","type":"幼兒園","address":"大園區五青路238號","area":"大園","head":"張春美","contact":"張○美","phone":"03-3814881","fax":"03-3818641","benefit":"免收延托費(17:00-18:00)。","period":"113年7月8日至115年7月7日止"},
+      {"id":34,"name":"桃園市私立欣欣幼兒園","type":"幼兒園","address":"觀音區信義路26號","area":"觀音","head":"許萬地","contact":"許○地","phone":"03-4732101","fax":"03-4735528","benefit":"贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":35,"name":"桃園市私立小狀元幼兒園","type":"幼兒園","address":"觀音區保生街40巷11號","area":"觀音","head":"黃文興","contact":"黃○興","phone":"03-4734685","fax":"03-4736341","benefit":"每學期教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":36,"name":"桃園市私立童話幼兒園","type":"幼兒園","address":"中壢區龍川街37號","area":"中壢","head":"黃雪芳","contact":"黃○芳","phone":"03-4375990","fax":"03-4375991","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":37,"name":"桃園市私立同德幼兒園","type":"幼兒園","address":"桃園區新埔六街77號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3173777","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":38,"name":"桃園市私立美森堡幼兒園","type":"幼兒園","address":"桃園區樹仁三街233號","area":"桃園","head":"游象慶","contact":"游○慶","phone":"03-3749722","fax":"03-3749721","benefit":"贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":39,"name":"桃園市私立全漢幼兒園","type":"幼兒園","address":"平鎮區復旦路二段207巷7-2號","area":"平鎮","head":"許漢章","contact":"許○章","phone":"03-4919133","fax":"03-4927233","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":40,"name":"桃園市私立奇異鳥幼兒園","type":"幼兒園","address":"龜山區文化二路34巷14弄28號","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3979051","fax":"03-3979053","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":41,"name":"桃園市私立文心南昌幼兒園","type":"幼兒園","address":"八德區南昌街39號","area":"八德","head":"簡文心","contact":"簡○心","phone":"03-3652877","fax":"03-3652879","benefit":"贈送書包、餐具組、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":42,"name":"桃園市私立愛迪兒幼兒園","type":"幼兒園","address":"中壢區三民路一段75號","area":"中壢","head":"張長榮","contact":"張○榮","phone":"03-4261777","fax":"03-4265777","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":43,"name":"桃園市私立愛迪生幼兒園","type":"幼兒園","address":"中壢區龍和三街82號","area":"中壢","head":"張長榮","contact":"張○榮","phone":"03-4361777","fax":"03-4361555","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":44,"name":"桃園市私立寶貝城堡幼兒園","type":"幼兒園","address":"八德區高城八街35號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3788177","fax":"03-3788200","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":45,"name":"桃園市私立豐格幼兒園","type":"幼兒園","address":"大園區大興路50巷2弄20號","area":"大園","head":"張春美","contact":"張○美","phone":"03-3850550","fax":"03-3858055","benefit":"免收延托費(17:00-18:00)。","period":"113年7月8日至115年7月7日止"},
+      {"id":46,"name":"桃園市私立幼強幼兒園","type":"幼兒園","address":"大園區中華路84號","area":"大園","head":"張春美","contact":"張○美","phone":"03-3860000","fax":"03-3853100","benefit":"免收延托費(17:00-18:00)。","period":"113年7月8日至115年7月7日止"},
+      {"id":47,"name":"桃園市私立華盛頓幼兒園","type":"幼兒園","address":"平鎮區廣德街181號","area":"平鎮","head":"黃振龍","contact":"黃○龍","phone":"03-4927958","fax":"03-4912959","benefit":"贈送書包、餐具、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":48,"name":"桃園市私立幼祥幼兒園","type":"幼兒園","address":"中壢區成章一街151號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-4355520","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":49,"name":"桃園市私立新愛迪生幼兒園","type":"幼兒園","address":"中壢區龍和三街80號","area":"中壢","head":"張長榮","contact":"張○榮","phone":"03-4663333","fax":"03-4660303","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":50,"name":"桃園市私立福祿貝爾幼兒園","type":"幼兒園","address":"蘆竹區長興路三段120巷23號","area":"蘆竹","head":"羅振興","contact":"羅○興","phone":"03-3221010","fax":"03-3224727","benefit":"贈送書包、餐袋(三色碗)。","period":"113年7月8日至115年7月7日止"},
+      {"id":51,"name":"桃園市私立瑞恩帝兒同峰幼兒園","type":"幼兒園","address":"桃園區同峰街151號","area":"桃園","head":"呂文芳","contact":"李○珠","phone":"03-3561999","fax":"03-3568855","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":52,"name":"桃園市私立加貝爾幼兒園","type":"幼兒園","address":"桃園區國際路二段273號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3607733","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":53,"name":"桃園市私立欣恩幼兒園","type":"幼兒園","address":"平鎮區金陵路二段327巷11號","area":"平鎮","head":"許秋芬","contact":"許○芬","phone":"03-4589993","fax":"03-4589997","benefit":"幼兒教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":54,"name":"桃園市私立豐禾幼兒園","type":"幼兒園","address":"蘆竹區富國路一段258號","area":"蘆竹","head":"李俊漢","contact":"陳○蓉","phone":"03-3136888","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":55,"name":"桃園市私立福祿貝爾科博幼兒園","type":"幼兒園","address":"桃園區同德十一街49號","area":"桃園","head":"羅振興","contact":"羅○興","phone":"03-3567888","fax":"03-3567688","benefit":"贈送書包、餐袋(三色碗)。","period":"113年7月8日至115年7月7日止"},
+      {"id":56,"name":"桃園市私立英格堡幼兒園","type":"幼兒園","address":"桃園區忠五路72號","area":"桃園","head":"簡文心","contact":"簡○心","phone":"03-3323067","fax":"03-3371908","benefit":"贈送書包、餐具組、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":57,"name":"桃園市私立百吉幼兒園","type":"幼兒園","address":"大溪區八德里仁和一街48號","area":"大溪","head":"呂理祥","contact":"呂○祥","phone":"03-3801265","fax":"03-3908351","benefit":"幼兒教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":58,"name":"桃園市私立德育大竹幼兒園","type":"幼兒園","address":"蘆竹區竹中街67號","area":"蘆竹","head":"李俊漢","contact":"陳○蓉","phone":"03-3138833","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":59,"name":"桃園市私立福祿貝爾復興幼兒園","type":"幼兒園","address":"桃園區復興路377號","area":"桃園","head":"羅振興","contact":"羅○興","phone":"03-3343366","fax":"03-3392760","benefit":"贈送書包、餐袋(三色碗)。","period":"113年7月8日至115年7月7日止"},
+      {"id":60,"name":"桃園市私立新世紀幼兒園","type":"幼兒園","address":"楊梅區中山北路一段390巷45弄27-1號","area":"楊梅","head":"葉星秀","contact":"葉○秀","phone":"03-4786737","fax":"03-4784795","benefit":"贈送書包1個。","period":"113年7月8日至115年7月7日止"},
+      {"id":61,"name":"桃園市私立奇異鳥文化幼兒園","type":"幼兒園","address":"龜山區文德二路2巷10號","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3183616","fax":"03-3183626","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":62,"name":"桃園市私立愛林幼兒園","type":"幼兒園","address":"中壢區林森路108號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-4573130","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":63,"name":"桃園市私立衛斯理幼兒園","type":"幼兒園","address":"蘆竹區上興路41號","area":"蘆竹","head":"楊秀絨","contact":"楊○絨","phone":"03-3230699","fax":"03-3232077","benefit":"贈送書包、餐袋。","period":"113年7月8日至115年7月7日止"},
+      {"id":64,"name":"桃園市私立同安幼兒園","type":"幼兒園","address":"桃園區同安街336巷16號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3568800","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":65,"name":"桃園市私立瑞恩帝兒中正幼兒園","type":"幼兒園","address":"桃園區同安街257號","area":"桃園","head":"呂文芳","contact":"李○珠","phone":"03-3560777","fax":"03-3560555","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":66,"name":"桃園市私立奇異鳥美語幼兒園","type":"幼兒園","address":"龜山區文化二路34巷14弄28號1樓","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3979051","fax":"03-3979053","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":67,"name":"桃園市私立童話森林幼兒園","type":"幼兒園","address":"楊梅區三民東路127號","area":"楊梅","head":"黃雪芳","contact":"黃○芳","phone":"03-4819777","fax":"03-4817755","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":68,"name":"桃園市私立華盛頓大竹幼兒園","type":"幼兒園","address":"蘆竹區大新路286號","area":"蘆竹","head":"黃雪芳","contact":"黃○芳","phone":"03-3135990","fax":"03-3135991","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":69,"name":"桃園市私立百吉大溪幼兒園","type":"幼兒園","address":"大溪區仁善一街37號","area":"大溪","head":"呂理祥","contact":"呂○祥","phone":"03-3801265","fax":"03-3908351","benefit":"幼兒教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":70,"name":"桃園市私立快樂寶貝幼兒園","type":"幼兒園","address":"桃園區泰昌三街82號","area":"桃園","head":"陳燕輝","contact":"邱○湄","phone":"03-2200236","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":71,"name":"桃園市私立奇異鳥文德幼兒園","type":"幼兒園","address":"龜山區文化三路386號2樓","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3273918","fax":"03-3273928","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":72,"name":"桃園市私立奇異鳥林口幼兒園","type":"幼兒園","address":"龜山區文化三路386號","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3273918","fax":"03-3273928","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":73,"name":"桃園市私立柏克萊幼兒園","type":"幼兒園","address":"桃園市平鎮區新貴里關爺東路57號","area":"平鎮","head":"黃振龍","contact":"黃○龍","phone":"03-4581177","fax":"03-4573355","benefit":"贈送書包、餐具、圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":74,"name":"桃園市私立福祿貝爾世界幼兒園","type":"幼兒園","address":"龜山區長壽路164-1號","area":"龜山","head":"羅振興","contact":"羅○興","phone":"03-3507888","fax":"03-3507688","benefit":"贈送書包、餐袋(三色碗)。","period":"113年7月8日至115年7月7日止"},
+      {"id":75,"name":"桃園市私立小狀元新坡幼兒園","type":"幼兒園","address":"觀音區中山路二段896號","area":"觀音","head":"黃文興","contact":"黃○興","phone":"03-4988015","fax":"03-4988016","benefit":"每學期教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":76,"name":"桃園市私立格林大華幼兒園","type":"幼兒園","address":"龜山區自強南路340號","area":"龜山","head":"趙良英","contact":"趙○英","phone":"03-3298288","fax":"03-3507119","benefit":"贈送書包、餐具、室內鞋。","period":"113年7月8日至115年7月7日止"},
+      {"id":77,"name":"桃園市私立大都會幼兒園","type":"幼兒園","address":"八德區廣福路389巷10弄8-1號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3772277","fax":"03-3772200","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":78,"name":"桃園市私立平鎮大都會幼兒園","type":"幼兒園","address":"平鎮區復旦路二段211巷10弄2號","area":"平鎮","head":"陳淑貞","contact":"林○華","phone":"03-4948877","fax":"03-4948800","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":79,"name":"桃園市私立青園幼兒園","type":"幼兒園","address":"中壢區青埔四街92號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-2870198","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":80,"name":"桃園市私立心語幼兒園","type":"幼兒園","address":"中壢區青商路18號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-2873111","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":81,"name":"桃園市私立普利斯頓幼兒園","type":"幼兒園","address":"桃園區溫州街62號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3011388","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":82,"name":"桃園市私立奇異鳥美語文化幼兒園","type":"幼兒園","address":"龜山區文德二路2巷10號1樓","area":"龜山","head":"李偉平","contact":"李○平","phone":"03-3183616","fax":"03-3183626","benefit":"入學贈送書包、圍兜各1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":83,"name":"桃園市私立新生幼兒園","type":"幼兒園","address":"桃園區新生路192號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3351986","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":84,"name":"桃園市私立新康大幼兒園","type":"幼兒園","address":"中壢區領航北路二段100號","area":"中壢","head":"林康敏","contact":"林○敏","phone":"03-2871026","fax":"03-2871028","benefit":"贈送當季制服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":85,"name":"桃園市私立瑞恩帝兒南平幼兒園","type":"幼兒園","address":"桃園區南平路80號","area":"桃園","head":"呂文芳","contact":"李○珠","phone":"03-3172288","fax":"03-3172299","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":86,"name":"桃園市私立平鎮育全幼兒園","type":"幼兒園","address":"平鎮區南京路119號","area":"平鎮","head":"陳淑貞","contact":"林○華","phone":"03-4395666","fax":"03-4395669","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":87,"name":"桃園市私立長頸鹿文化幼兒園","type":"幼兒園","address":"中壢區廣州路198號2樓","area":"中壢","head":"陳燕輝","contact":"邱○湄","phone":"03-4688266","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":88,"name":"桃園市私立普利斯堡幼兒園","type":"幼兒園","address":"桃園區同德二街32號","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3571188","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":89,"name":"桃園市私立中壢福祿貝爾幼兒園","type":"幼兒園","address":"中壢區三民路一段105號","area":"中壢","head":"羅振興","contact":"羅○興","phone":"03-4277888","fax":"03-4277688","benefit":"贈送書包、餐袋(三色碗)。","period":"113年7月8日至115年7月7日止"},
+      {"id":90,"name":"桃園市私立大業幼兒園","type":"幼兒園","address":"桃園區大業路二段71號2樓","area":"桃園","head":"李俊漢","contact":"陳○蓉","phone":"03-3161778","fax":"-","benefit":"致贈相關學用品、提供就讀免費教育諮詢服務。","period":"113年7月8日至115年7月7日止"},
+      {"id":91,"name":"桃園市私立國際長頸鹿大園幼兒園","type":"幼兒園","address":"大園區大觀路777號","area":"大園","head":"陳燕輝","contact":"邱○湄","phone":"03-3866200","fax":"03-3786313","benefit":"1.集體送托人數達2名，就學滿2個月以上可享有1次月費減免1,000元。\n2.每位新生註冊後贈送書包、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":92,"name":"桃園市私立八德大都會幼兒園","type":"幼兒園","address":"八德區福國北街85號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3665577","fax":"03-3665500","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":93,"name":"桃園市私立童話世界幼兒園","type":"幼兒園","address":"中壢區成章一街153號","area":"中壢","head":"黃雪芳","contact":"黃○芳","phone":"03-4558588","fax":"03-4558589","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":94,"name":"桃園市私立大園大都會幼兒園","type":"幼兒園","address":"大園區領航北路四段356號","area":"大園","head":"陳淑貞","contact":"林○華","phone":"03-3815577","fax":"03-3815500","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":95,"name":"桃園市私立大竹大都會幼兒園","type":"幼兒園","address":"蘆竹區大新路288號","area":"蘆竹","head":"陳淑貞","contact":"林○華","phone":"03-3135577","fax":"03-3135500","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":96,"name":"桃園市私立八德育全幼兒園","type":"幼兒園","address":"八德區介壽路二段364巷32弄2號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3686677","fax":"03-3686600","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":97,"name":"桃園市私立全美大溪幼兒園","type":"幼兒園","address":"大溪區文化路176號","area":"大溪","head":"陳淑貞","contact":"林○華","phone":"03-3885577","fax":"03-3885500","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":98,"name":"桃園市私立童話城堡幼兒園","type":"幼兒園","address":"中壢區吉林路68-9號","area":"中壢","head":"黃雪芳","contact":"黃○芳","phone":"03-4519997","fax":"03-4519998","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":99,"name":"桃園市私立全美幼兒園","type":"幼兒園","address":"八德區豐田三路10號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3689977","fax":"03-3689900","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":100,"name":"桃園市私立全美國際幼兒園","type":"幼兒園","address":"桃園區德育街53號","area":"桃園","head":"陳淑貞","contact":"林○華","phone":"03-3351177","fax":"03-3351100","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":101,"name":"桃園市私立全美八德幼兒園","type":"幼兒園","address":"八德區高城八街33號","area":"八德","head":"陳淑貞","contact":"林○華","phone":"03-3796677","fax":"03-3796600","benefit":"送當季運動服1套。","period":"113年7月8日至115年7月7日止"},
+      {"id":102,"name":"桃園市私立心語新美幼兒園","type":"幼兒園","address":"中壢區領航南路一段132號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-2877111","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":103,"name":"桃園市私立青園美語幼兒園","type":"幼兒園","address":"中壢區洽溪路339號","area":"中壢","head":"蔡秋娥","contact":"蔡○娥","phone":"03-2876698","fax":"-","benefit":"每學期幼兒各類簿本教材費9折。","period":"113年7月8日至115年7月7日止"},
+      {"id":104,"name":"桃園市私立華盛頓大竹課後照顧服務中心","type":"課後照顧服務中心","address":"蘆竹區大新路286號2樓","area":"蘆竹","head":"黃雪芳","contact":"黃○芳","phone":"03-3135990","fax":"03-3135991","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":105,"name":"桃園市私立快樂課後照顧服務中心","type":"課後照顧服務中心","address":"中壢區普騰街56號2樓之1","area":"中壢","head":"黃乾德","contact":"黃○德","phone":"03-4560738","fax":"03-4566418","benefit":"贈送書包、圍兜、餐具。","period":"113年7月8日至115年7月7日止"},
+      {"id":106,"name":"桃園市私立童話課後照顧服務中心","type":"課後照顧服務中心","address":"中壢區榮民南路829號","area":"中壢","head":"黃雪芳","contact":"黃○芳","phone":"03-4375990","fax":"03-4375991","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":107,"name":"桃園市私立童話森林課後照顧服務中心","type":"課後照顧服務中心","address":"楊梅區三民東路127號2樓之1","area":"楊梅","head":"黃雪芳","contact":"黃○芳","phone":"03-4819777","fax":"03-4817755","benefit":"註冊新生贈送書包、餐具及圍兜。","period":"113年7月8日至115年7月7日止"},
+      {"id":108,"name":"桃園市私立幼強托嬰中心","type":"托嬰中心","address":"大園區和平東路81號","area":"大園","head":"張春美","contact":"張○美","phone":"03-3860000","fax":"03-3853100","benefit":"免收延托費(17:00-18:00)。","period":"113年7月8日至115年7月7日止"},
+      {"id":109,"name":"桃園市私立晨光托嬰中心","type":"托嬰中心","address":"大園區五青路238號1樓","area":"大園","head":"張春美","contact":"張○美","phone":"03-3814881","fax":"03-3818641","benefit":"免收延托費(17:00-18:00)。","period":"113年7月8日至115年7月7日止"},
+      {"id":110,"name":"桃園市私立欣恩托嬰中心","type":"托嬰中心","address":"平鎮區金陵路二段327巷11號1.2樓","area":"平鎮","head":"許秋芬","contact":"許○芬","phone":"03-4589993","fax":"03-4589997","benefit":"註冊新生贈送圍兜1件。","period":"113年7月8日至115年7月7日止"},
+      {"id":111,"name":"桃園市私立格林大華托嬰中心","type":"托嬰中心","address":"龜山區自強南路340號1樓","area":"龜山","head":"趙良英","contact":"趙○英","phone":"03-3298288","fax":"03-3507119","benefit":"贈送精美圍兜。","period":"113年7月8日至115年7月7日止"}
+    ];
+
+    // 行政區基準座標（用於地圖定址錨定）
+    const DISTRICT_CENTERS = {
+      '桃園': [24.9936, 121.3010],
+      '中壢': [24.9654, 121.2248],
+      '八德': [24.9287, 121.2846],
+      '平鎮': [24.9450, 121.2185],
+      '楊梅': [24.9080, 121.1458],
+      '蘆竹': [25.0456, 121.2917],
+      '大園': [25.0645, 121.1963],
+      '龜山': [24.9961, 121.3644],
+      '龍潭': [24.8637, 121.2163],
+      '大溪': [24.8837, 121.2882],
+      '觀音': [25.0368, 121.0827],
+      '新屋': [24.9722, 121.1062]
+    };
+
+    // 確定性座標偏移演算法（基於地址字串雜湊，確保同一機構重整後位置固定，且不會全部死疊在同一點）
+    function computeCoords(area, address) {
+      const cleanArea = area.replace('區', '').trim();
+      const base = DISTRICT_CENTERS[cleanArea] || [24.9936, 121.3010];
+      let hash = 0;
+      for (let i = 0; i < address.length; i++) {
+        hash = (hash << 5) - hash + address.charCodeAt(i);
+        hash |= 0;
+      }
+      const latOffset = ((Math.abs(hash) % 1000) - 500) / 75000.0;
+      const lngOffset = (((Math.abs(hash >> 5)) % 1000) - 500) / 75000.0;
+      return [Number((base[0] + latOffset).toFixed(6)), Number((base[1] + lngOffset).toFixed(6))];
+    }
+
+    // 初始化資料與座標
+    const facilities = RAW_DATA.map(item => {
+      const coords = computeCoords(item.area, item.address);
+      return {
+        ...item,
+        lat: coords[0],
+        lng: coords[1]
+      };
+    });
+
+    // 初始化地圖
+    const map = L.map('map', {
+      center: [24.985, 121.24],
+      zoom: 12,
+      zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者',
+      maxZoom: 19
+    }).addTo(map);
+
+    // 建立聚合圖層群組
+    const clusterGroup = L.markerClusterGroup({
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 40
+    });
+    map.addLayer(clusterGroup);
+
+    // 關聯 Marker 與 DOM
+    const markerMap = new Map();
+
+    function getTypeTagClass(type) {
+      if (type.includes('幼兒園')) return 'tag-kindergarten';
+      if (type.includes('課後')) return 'tag-afterschool';
+      if (type.includes('托嬰')) return 'tag-infant';
+      return '';
+    }
+
+    function buildPopupHtml(f) {
+      const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.address)}`;
+      return `
+        <div class="popup-box">
+          <div class="popup-title">${f.name}</div>
+          <div class="popup-field"><strong>種類：</strong>${f.type}（${f.area}區）</div>
+          <div class="popup-field"><strong>地址：</strong>${f.address}</div>
+          <div class="popup-field"><strong>電話：</strong><a href="tel:${f.phone}">${f.phone}</a> ${f.fax !== '-' ? `| 傳真：${f.fax}` : ''}</div>
+          <div class="popup-field"><strong>負責人/聯絡人：</strong>${f.head} / ${f.contact}</div>
+          <div class="popup-field"><strong>特約期間：</strong>${f.period}</div>
+          <div class="popup-benefit"><strong>特約優惠措施：</strong><br>${f.benefit}</div>
+          <a class="btn-nav" href="${gmapsUrl}" target="_blank" rel="noopener noreferrer">開啟 Google 導航 ↗</a>
+        </div>
+      `;
+    }
+
+    // 渲染清單與標記
+    function render(data) {
+      clusterGroup.clearLayers();
+      markerMap.clear();
+
+      const listContainer = document.getElementById('facilityList');
+      listContainer.innerHTML = '';
+
+      document.getElementById('filteredCount').innerText = `共 ${data.length} 家`;
+      document.getElementById('statsCount').innerText = `目前顯示: ${data.length} / 111 家`;
+
+      if (data.length === 0) {
+        listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #9ca3af;">無符合條件的特約機構</div>';
+        return;
+      }
+
+      data.forEach(item => {
+        // 1. 建立地圖 Marker
+        const marker = L.marker([item.lat, item.lng]);
+        marker.bindPopup(buildPopupHtml(item), { maxWidth: 320 });
+        clusterGroup.addLayer(marker);
+        markerMap.set(item.id, marker);
+
+        // 2. 建立側邊欄 Card
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `card-${item.id}`;
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-title">${item.id}. ${item.name}</span>
+            <span class="tag ${getTypeTagClass(item.type)}">${item.type}</span>
+          </div>
+          <div class="card-meta">📍 ${item.address}</div>
+          <div class="card-meta">📞 ${item.phone} ｜ 聯絡人：${item.contact}</div>
+          <div class="card-benefit">🎁 優惠：${item.benefit.replace(/\n/g, ' ')}</div>
+        `;
+
+        // 點擊卡片定位地圖
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+
+          clusterGroup.zoomToShowLayer(marker, () => {
+            map.flyTo([item.lat, item.lng], 16, { duration: 0.8 });
+            marker.openPopup();
+          });
+        });
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    // 建立下拉選單選項
+    function populateDropdowns() {
+      const areaSelect = document.getElementById('areaFilter');
+      const typeSelect = document.getElementById('typeFilter');
+
+      const areas = Array.from(new Set(facilities.map(f => f.area))).filter(Boolean);
+      areas.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a;
+        opt.innerText = `${a}區`;
+        areaSelect.appendChild(opt);
+      });
+
+      const types = Array.from(new Set(facilities.map(f => f.type))).filter(Boolean);
+      types.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.innerText = t;
+        typeSelect.appendChild(opt);
+      });
+    }
+
+    // 篩選核心邏輯
+    function applyFilters() {
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      const selectedArea = document.getElementById('areaFilter').value;
+      const selectedType = document.getElementById('typeFilter').value;
+
+      const filtered = facilities.filter(item => {
+        const matchKeyword = !keyword ||
+          item.name.toLowerCase().includes(keyword) ||
+          item.address.toLowerCase().includes(keyword) ||
+          item.phone.includes(keyword) ||
+          item.benefit.toLowerCase().includes(keyword);
+
+        const matchArea = !selectedArea || item.area === selectedArea;
+        const matchType = !selectedType || item.type === selectedType;
+
+        return matchKeyword && matchArea && matchType;
+      });
+
+      render(filtered);
+    }
+
+    // 事件監聽
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('areaFilter').addEventListener('change', applyFilters);
+    document.getElementById('typeFilter').addEventListener('change', applyFilters);
+
+    // 啟動程式
+    populateDropdowns();
+    render(facilities);
+  </script>
+</body>
+</html>
